@@ -1,0 +1,108 @@
+---
+title: "Cyclistic Bikeshare Data Wrangling"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+## Load Cyclistic Bike Ride Data for 12 months
+
+```{python}
+import os
+import pandas as pd
+import seaborn as sns
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Step 1: Read directory containing CSV files
+directory = './data/'
+data_frames = []
+
+for filename in os.listdir(directory):
+    if filename.endswith('.csv'):
+        file_path = os.path.join(directory, filename)
+        df = pd.read_csv(file_path)
+        data_frames.append(df)
+
+# Step 2: Combine into a single DataFrame
+combined_df = pd.concat(data_frames, ignore_index=True)
+
+# Step 3: Delete rows where start_station_name is null
+combined_df = combined_df.dropna(subset=['start_station_name'])
+
+# Step 4: Extract start_date and end_date
+combined_df['start_date'] = pd.to_datetime(combined_df['started_at']).dt.date
+combined_df['end_date'] = pd.to_datetime(combined_df['ended_at']).dt.date
+
+# Step 5: Keep rows where start_date is equal to end_date
+combined_df = combined_df[combined_df['start_date'] == combined_df['end_date']]
+
+# Step 6: Drop specified columns
+columns_to_drop = ['ride_id', 'start_station_id', 'end_station_id', 'end_station_name']
+combined_df = combined_df.drop(columns=columns_to_drop)
+
+# Step 7: Extract month, day of week, and hour
+combined_df['month'] = pd.to_datetime(combined_df['started_at']).dt.month
+combined_df['day_of_week'] = pd.to_datetime(combined_df['started_at']).dt.dayofweek
+combined_df['hour_of_ride'] = pd.to_datetime(combined_df['started_at']).dt.hour
+
+# Step 8: Calculate trip duration in minutes
+combined_df['trip_duration'] = (pd.to_datetime(combined_df['ended_at']) - pd.to_datetime(combined_df['started_at'])).dt.total_seconds() / 60
+
+# Step 9: Rename columns and round latitude and longitude
+combined_df = combined_df.rename(columns={'start_lat': 'latitude', 'start_lng': 'longitude'})
+combined_df['latitude'] = combined_df['latitude'].round(3)
+combined_df['longitude'] = combined_df['longitude'].round(3)
+
+columns_to_drop = ['started_at', 'ended_at', 'end_lat', 'end_lng']
+combined_df = combined_df.drop(columns=columns_to_drop)
+
+# Display the resulting DataFrame
+combined_df.columns
+
+```
+
+## Begin EDA
+
+```{python}
+# EDA - Summary Statistics
+summary_stats = combined_df.describe()
+print(summary_stats)
+
+# EDA - Histogram of Trip Durations
+plt.figure(figsize=(8, 6))
+plt.hist(combined_df['trip_duration'], bins=30, edgecolor='k')
+plt.xlabel('Trip Duration (minutes)')
+plt.ylabel('Frequency')
+plt.title('Histogram of Trip Durations')
+plt.show()
+
+# EDA - Bar Plot of Monthly Ride Counts
+monthly_ride_counts = combined_df['month'].value_counts().sort_index()
+plt.figure(figsize=(8, 6))
+monthly_ride_counts.plot(kind='bar', edgecolor='k')
+plt.xlabel('Month')
+plt.ylabel('Ride Count')
+plt.title('Monthly Ride Counts')
+plt.xticks(rotation=0)
+plt.show()
+
+# EDA - Scatter Plot of Latitude vs. Longitude
+plt.figure(figsize=(8, 6))
+plt.scatter(combined_df['longitude'], combined_df['latitude'], s=10, alpha=0.5)
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
+plt.title('Scatter Plot of Latitude vs. Longitude')
+plt.show()
+
+# EDA - Box Plot of Trip Durations by Day of Week
+plt.figure(figsize=(8, 6))
+combined_df.boxplot(column='trip_duration', by='day_of_week')
+plt.xlabel('Day of Week')
+plt.ylabel('Trip Duration (minutes)')
+plt.title('Box Plot of Trip Durations by Day of Week')
+plt.xticks([1, 2, 3, 4, 5, 6, 7], ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+plt.show()
+
+```
